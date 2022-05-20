@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 import datetime as dt
 import copy as cp
+import scipy.stats as stats
+import matplotlib.pyplot as plt
 
 transportCnt = dict()
 
@@ -91,3 +93,59 @@ def get_trCnt():
     add_transportCnt( datesList, comeInsList )
 
     return transportCnt
+
+
+def get_holiday_dict():
+    dict_holi_type = {}
+    dict_holi_len = {}
+    df_holiday = pd.read_excel( 'Holidays.xlsx' )
+    for i in range( len( df_holiday ) ):
+        stDate = df_holiday.iloc[ i ][ 0 ].to_pydatetime()
+        Duration = df_holiday.iloc[ i ][ 1 ]
+        holiType = df_holiday.iloc[ i ][ 2 ]
+        currentDt = stDate
+
+        for i in range( Duration ):
+            dict_holi_len[ currentDt ] = Duration
+            dict_holi_type[ currentDt ] = holiType
+            currentDt = currentDt + dt.timedelta( days=1 )
+    return dict_holi_type, dict_holi_len
+
+
+def self_qqplot( glo_data: dict, year_split ) -> None:
+    data = [ ( date, glo_data[ date ] ) for date in glo_data.keys() ]
+    data = sorted( data, key=lambda i: i[ 1 ] )
+    temp = []
+    for date, cnt in data:
+        temp.append( np.array( [ date.year, cnt ] ) )
+    temp = np.array( temp )
+    mean = np.mean( temp.T[ 1 ] )
+    sigma = temp.T[ 1 ].std( ddof=1 )
+
+    nd = stats.norm( mean, sigma )
+    percent = 0
+    single_percent = 1 / len( data )
+
+    theo = []
+    for i in range( len( data ) ):
+        theo.append( nd.ppf( percent ) )
+        percent += single_percent
+
+    year = list( temp.T[ 0 ] )
+    cnt = list( temp.T[ 1 ] )
+
+    before_pair = []
+    after_pair = []
+    for i in range( len( year ) ):
+        if year[ i ] >= year_split:
+            after_pair.append( np.array( [ cnt[ i ], theo[ i ] ] ) )
+        else:
+            before_pair.append( np.array( [ cnt[ i ], theo[ i ] ] ) )
+    before_pair = np.array( before_pair )
+    after_pair = np.array( after_pair )
+
+    fig, ax = plt.subplots( 1, 2, figsize=( 30, 10 ) )
+    ax[ 0 ].scatter( before_pair.T[ 1 ], before_pair.T[ 0 ], c='b', s=2.5, alpha=0.3 )
+    ax[ 1 ].scatter( after_pair.T[ 1 ], after_pair.T[ 0 ], c='r', s=2.5, alpha=0.3 )
+    ax[ 0 ].plot( ax[ 0 ].get_xlim(), ax[ 0 ].get_xlim(), color="black", alpha=0.3 )
+    ax[ 1 ].plot( ax[ 1 ].get_xlim(), ax[ 1 ].get_xlim(), color="black", alpha=0.3 )
