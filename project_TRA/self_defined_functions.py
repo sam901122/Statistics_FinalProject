@@ -112,48 +112,52 @@ def get_holiday_dict():
     return dict_holi_type, dict_holi_len
 
 
-def self_qqplot( glo_data: dict, year_split ) -> None:
-    data = [ ( date, glo_data[ date ] ) for date in glo_data.keys() ]
-    data = sorted( data, key=lambda i: i[ 1 ] )
-    temp = []
-    for date, cnt in data:
-        temp.append( np.array( [ date.year, cnt ] ) )
-    temp = np.array( temp )
-    mean = np.mean( temp.T[ 1 ] )
-    sigma = temp.T[ 1 ].std( ddof=1 )
+def self_qqplot( glo_data: dict, year_split=20000 ) -> None:
+    dates = []
+    cnts = []
+    for key in glo_data.keys():
+        dates.append( key )
+        cnts.append( glo_data[ key ] )
 
-    nd = stats.norm( mean, sigma )
+    cnts, dates = [ np.array( i ) for i in zip( *sorted( zip( cnts, dates ) ) ) ]
+
+    mean = np.mean( cnts )
+    std = cnts.std( ddof=1 )
+    nd = stats.norm( mean, std )
+
     percent = 0
-    single_percent = 1 / len( data )
+    single_percent = 1 / len( dates )
 
-    theo = []
-    for i in range( len( data ) ):
-        theo.append( nd.ppf( percent ) )
+    theos = []
+    for i in range( len( dates ) ):
+        theos.append( nd.ppf( percent ) )
         percent += single_percent
+    theos = np.array( theos )
 
-    year = list( temp.T[ 0 ] )
-    cnt = list( temp.T[ 1 ] )
+    before_pair = { 'cnt': [], 'theo': [] }
+    after_pair = { 'cnt': [], 'theo': [] }
 
-    before_pair = []
-    after_pair = []
-    for i in range( len( year ) ):
-        if year[ i ] >= year_split:
-            after_pair.append( np.array( [ cnt[ i ], theo[ i ] ] ) )
+    for i in range( len( dates ) ):
+        if dates[ i ].year >= year_split:
+            after_pair[ 'cnt' ].append( cnts[ i ] )
+            after_pair[ 'theo' ].append( theos[ i ] )
         else:
-            before_pair.append( np.array( [ cnt[ i ], theo[ i ] ] ) )
-    before_pair = np.array( before_pair )
-    after_pair = np.array( after_pair )
+            before_pair[ 'cnt' ].append( cnts[ i ] )
+            before_pair[ 'theo' ].append( theos[ i ] )
 
     fig = plt.figure( figsize=( 20, 10 ) )
     ax1 = fig.add_subplot( 2, 1, 1 )
     ax2 = fig.add_subplot( 2, 1, 2, sharex=ax1, sharey=ax1 )
-    ax1.scatter( before_pair.T[ 1 ], before_pair.T[ 0 ], c='b', s=2.5, alpha=0.1 )
-    ax2.scatter( after_pair.T[ 1 ], after_pair.T[ 0 ], c='r', s=2.5, alpha=0.1 )
+    ax1.scatter( before_pair[ 'theo' ], before_pair[ 'cnt' ], c='b', s=2.5, alpha=0.1 )
     ax1.plot( ax1.get_xlim(), ax1.get_xlim(), color="black", alpha=0.3 )
-    ax2.plot( ax2.get_xlim(), ax2.get_xlim(), color="black", alpha=0.3 )
-    '''
-    fig, ax = plt.subplots( 1, 2, figsize=( 30, 10 ) )
-    '''
+    if ( len( after_pair[ 'cnt' ] ) > 0 ):
+        ax2.scatter( after_pair[ 'theo' ], after_pair[ 'cnt' ], c='r', s=2.5, alpha=0.1 )
+        ax2.plot( ax2.get_xlim(), ax2.get_xlim(), color="black", alpha=0.3 )
+
+    # Outlier dict
+    dif = abs( theos - cnts )
+    dif, dates, cnts, theos = [ np.array( i ) for i in zip( *sorted( zip( dif, dates, cnts, theos ), reverse=True ) ) ]
+    return dates
 
 
 def get_ANOVA_df():
@@ -280,3 +284,16 @@ def get_ANOVA_df():
         'is_NYE': is_NYEs
     } )
     return ANOVA_df
+
+
+def build_dict( dates, values ):
+    dates = list( dates )
+    values = list( values )
+    temp_dict = {}
+    if len( dates ) != len( values ):
+        raise Exception( 'Different Len' )
+
+    for i in range( len( dates ) ):
+        temp_dict[ dates[ i ] ] = values[ i ]
+
+    return temp_dict
