@@ -1,3 +1,4 @@
+from cmath import sin
 import numpy as np
 import pandas as pd
 import datetime as dt
@@ -125,8 +126,8 @@ def self_qqplot( glo_data: dict, year_split=20000 ) -> None:
     std = cnts.std( ddof=1 )
     nd = stats.norm( mean, std )
 
-    percent = 0
     single_percent = 1 / len( dates )
+    percent = single_percent
 
     theos = []
     for i in range( len( dates ) ):
@@ -157,7 +158,7 @@ def self_qqplot( glo_data: dict, year_split=20000 ) -> None:
     # Outlier dict
     dif = abs( theos - cnts )
     dif, dates, cnts, theos = [ np.array( i ) for i in zip( *sorted( zip( dif, dates, cnts, theos ), reverse=True ) ) ]
-    return dates
+    return dif, dates, cnts, theos
 
 
 def get_ANOVA_df():
@@ -183,6 +184,7 @@ def get_ANOVA_df():
     holi_lens = []
     is_CNYEs = []
     is_NYEs = []
+    weekdays = []
 
     # Build table
     for key in transCnt_dict.keys():
@@ -194,6 +196,9 @@ def get_ANOVA_df():
 
         # month
         months.append( key.month )
+
+        # weekday
+        weekdays.append( key.weekday() )
 
         # day
         days.append( key.day )
@@ -213,7 +218,7 @@ def get_ANOVA_df():
             else:
                 day_types.append( 'NewYearEve' )
         else:
-            if key.weekday() in range( 0, 5 ):
+            if key.weekday() in range( 0, 4 ):
                 day_types.append( 'weekday' )
             else:
                 day_types.append( 'weekend' )
@@ -222,7 +227,7 @@ def get_ANOVA_df():
         if key in holi_dict_type.keys():
             holi_types.append( holi_dict_type[ key ] )
         else:
-            if key.weekday() in range( 0, 5 ):
+            if key.weekday() in range( 0, 4 ):
                 holi_types.append( 'weekday' )
             else:
                 holi_types.append( 'weekend' )
@@ -257,6 +262,8 @@ def get_ANOVA_df():
             acc += 1
         else:
             for j in range( startIndex, endIndex ):
+                if acc >= 5:
+                    acc = 5
                 holi_lens.append( acc )
             acc = 1
             startIndex = endIndex
@@ -274,6 +281,7 @@ def get_ANOVA_df():
         'date': dates,
         'year': years,
         'month': months,
+        'weekday': weekdays,
         'day': days,
         'trans_cnt': trans_cnts,
         'is_typhoon': is_typhoons,
