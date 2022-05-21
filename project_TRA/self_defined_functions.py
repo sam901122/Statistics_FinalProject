@@ -144,8 +144,139 @@ def self_qqplot( glo_data: dict, year_split ) -> None:
     before_pair = np.array( before_pair )
     after_pair = np.array( after_pair )
 
+    fig = plt.figure( figsize=( 20, 10 ) )
+    ax1 = fig.add_subplot( 2, 1, 1 )
+    ax2 = fig.add_subplot( 2, 1, 2, sharex=ax1, sharey=ax1 )
+    ax1.scatter( before_pair.T[ 1 ], before_pair.T[ 0 ], c='b', s=2.5, alpha=0.1 )
+    ax2.scatter( after_pair.T[ 1 ], after_pair.T[ 0 ], c='r', s=2.5, alpha=0.1 )
+    ax1.plot( ax1.get_xlim(), ax1.get_xlim(), color="black", alpha=0.3 )
+    ax2.plot( ax2.get_xlim(), ax2.get_xlim(), color="black", alpha=0.3 )
+    '''
     fig, ax = plt.subplots( 1, 2, figsize=( 30, 10 ) )
-    ax[ 0 ].scatter( before_pair.T[ 1 ], before_pair.T[ 0 ], c='b', s=2.5, alpha=0.3 )
-    ax[ 1 ].scatter( after_pair.T[ 1 ], after_pair.T[ 0 ], c='r', s=2.5, alpha=0.3 )
-    ax[ 0 ].plot( ax[ 0 ].get_xlim(), ax[ 0 ].get_xlim(), color="black", alpha=0.3 )
-    ax[ 1 ].plot( ax[ 1 ].get_xlim(), ax[ 1 ].get_xlim(), color="black", alpha=0.3 )
+    '''
+
+
+def get_ANOVA_df():
+    holi_dict_type, holi_dict_len = get_holiday_dict()
+    typhoon_date = pd.read_excel( 'Typhoon_date.xlsx' )[ '日期' ]
+    typhoon_date = [ date.to_pydatetime() for date in typhoon_date ]
+    transCnt_dict = get_trCnt()
+    # Set
+    WORKDAYS = []
+    WEEKENDS = []
+    TRADI = [ '春節', '端午', '中秋' ]
+    NATION = [ '雙十', '二二八', '元旦', '清明', '勞動' ]
+
+    # List
+    dates = []
+    years = []
+    months = []
+    days = []
+    trans_cnts = []
+    is_typhoons = []
+    day_types = []
+    holi_types = []
+    holi_lens = []
+    is_CNYEs = []
+    is_NYEs = []
+
+    # Build table
+    for key in transCnt_dict.keys():
+        # dates
+        dates.append( key )
+
+        # year
+        years.append( key.year )
+
+        # month
+        months.append( key.month )
+
+        # day
+        days.append( key.day )
+
+        # trans_cnt
+        trans_cnts.append( transCnt_dict[ key ] )
+
+        # is_typhoon
+        is_typhoons.append( key in typhoon_date )
+
+        # day_type
+        if key in holi_dict_type.keys():
+            if holi_dict_type[ key ] in TRADI:
+                day_types.append( 'traditional' )
+            elif holi_dict_type[ key ] in NATION:
+                day_types.append( 'National' )
+            else:
+                day_types.append( 'NewYearEve' )
+        else:
+            if key.weekday() in range( 0, 5 ):
+                day_types.append( 'weekday' )
+            else:
+                day_types.append( 'weekend' )
+
+        # holi_type
+        if key in holi_dict_type.keys():
+            holi_types.append( holi_dict_type[ key ] )
+        else:
+            if key.weekday() in range( 0, 5 ):
+                holi_types.append( 'weekday' )
+            else:
+                holi_types.append( 'weekend' )
+
+        # is_CNYE
+        if key not in holi_dict_type.keys():
+            is_CNYEs.append( False )
+        else:
+            if holi_dict_type[ key ] == '春節':
+                try:
+                    if holi_dict_type[ key + dt.timedelta( days=-1 ) ] == '春節':
+                        is_CNYEs.append( False )
+                except:
+                    is_CNYEs.append( True )
+            else:
+                is_CNYEs.append( False )
+
+        # is_NYE
+        if key.month == 12 and key.day == 31:
+            is_NYEs.append( True )
+        else:
+            is_NYEs.append( False )
+
+    # holi_len
+    acc = 0
+    startIndex = 0
+    endIndex = 0
+    currentType = holi_types[ 0 ]
+    for i in range( len( holi_types ) ):
+        if holi_types[ i ] == currentType:
+            endIndex += 1
+            acc += 1
+        else:
+            for j in range( startIndex, endIndex ):
+                holi_lens.append( acc )
+            acc = 1
+            startIndex = endIndex
+            currentType = holi_types[ i ]
+            endIndex += 1
+
+    for i in range( startIndex, endIndex ):
+        holi_lens.append( acc )
+
+    for i in range( len( holi_types ) ):
+        if holi_types[ i ] == 'weekday':
+            holi_lens[ i ] = 0
+
+    ANOVA_df = pd.DataFrame( {
+        'date': dates,
+        'year': years,
+        'month': months,
+        'day': days,
+        'trans_cnt': trans_cnts,
+        'is_typhoon': is_typhoons,
+        'day_type': day_types,
+        'holi_type': holi_types,
+        'holi_len': holi_lens,
+        'is_CNYE': is_CNYEs,
+        'is_NYE': is_NYEs
+    } )
+    return ANOVA_df
