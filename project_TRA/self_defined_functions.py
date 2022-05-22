@@ -1,4 +1,4 @@
-from cmath import sin
+from cmath import phase, sin
 import numpy as np
 import pandas as pd
 import datetime as dt
@@ -161,14 +161,13 @@ def self_qqplot( glo_data: dict, year_split=20000 ) -> None:
     return dif, dates, cnts, theos
 
 
-def get_ANOVA_df():
+def gen_ANOVA_xlsx():
     holi_dict_type, holi_dict_len = get_holiday_dict()
     typhoon_date = pd.read_excel( 'Typhoon_date.xlsx' )[ '日期' ]
     typhoon_date = [ date.to_pydatetime() for date in typhoon_date ]
     transCnt_dict = get_trCnt()
+
     # Set
-    WORKDAYS = []
-    WEEKENDS = []
     TRADI = [ '春節', '端午', '中秋' ]
     NATION = [ '雙十', '二二八', '元旦', '清明', '勞動' ]
 
@@ -177,14 +176,34 @@ def get_ANOVA_df():
     years = []
     months = []
     days = []
+    weekdays = []
     trans_cnts = []
     is_typhoons = []
+    is_workings = []
     day_types = []
+    is_foreigns = []
     holi_types = []
     holi_lens = []
     is_CNYEs = []
     is_NYEs = []
-    weekdays = []
+    belongs = []
+    '''
+    date -> datetime()
+    year -> int, year of the date 
+    month -> int, month of the date 
+    day -> int, day of the date 
+    weekday -> int, [0,6] the weekday of the date 
+    trans_cnt -> int, the transport cnt of the date 
+    is_typhoon -> bool, is typhoon that date 
+    is_working -> bool, whether the days need to work 
+    day_type -> str, 'traditional', 'national', 'weekdend', 'weekday'
+    is_foreign -> bool, is the date a foreign holiday 
+    holi_type -> str, the type of the holiday 
+    holi_lens -> int, the length of the not working day 
+    phase -> str, 'start', 'mid', 'end'
+    is_NYE -> bool, is new year eve 
+    belong -> which holiday ( or weekend ) the day belong to
+    '''
 
     # Build table
     for key in transCnt_dict.keys():
@@ -197,11 +216,11 @@ def get_ANOVA_df():
         # month
         months.append( key.month )
 
-        # weekday
-        weekdays.append( key.weekday() )
-
         # day
         days.append( key.day )
+
+        # weekday
+        weekdays.append( key.weekday() )
 
         # trans_cnt
         trans_cnts.append( transCnt_dict[ key ] )
@@ -209,29 +228,40 @@ def get_ANOVA_df():
         # is_typhoon
         is_typhoons.append( key in typhoon_date )
 
+        # is_working
+        if ( weekdays[ -1 ] in range( 0, 5 ) ) and ( key not in holi_dict_type.keys() ):
+            is_workings.append( True )
+        else:
+            is_workings.append( False )
+
         # day_type
         if key in holi_dict_type.keys():
             if holi_dict_type[ key ] in TRADI:
-                day_types.append( 'traditional' )
+                day_types.append( 'Traditional' )
             elif holi_dict_type[ key ] in NATION:
                 day_types.append( 'National' )
-            else:
-                day_types.append( 'NewYearEve' )
         else:
-            if key.weekday() in range( 0, 4 ):
+            if key.weekday() in range( 0, 5 ):
                 day_types.append( 'weekday' )
             else:
                 day_types.append( 'weekend' )
+
+        # is_foreign
+        if ( key.month ) == 2 and ( key.day == 14 ):
+            is_foreigns.append( True )
+        elif ( key.month == 10 ) and ( key.day == 31 ):
+            is_foreigns.append( True )
+        elif ( key.month == 12 ) and ( key.day == 25 ):
+            is_foreigns.append( True )
+        else:
+            is_foreigns.append( False )
 
         # holi_type
         if key in holi_dict_type.keys():
             holi_types.append( holi_dict_type[ key ] )
         else:
-            if key.weekday() in range( 0, 4 ):
-                holi_types.append( 'weekday' )
-            else:
-                holi_types.append( 'weekend' )
-
+            holi_types.append( 'None' )
+        '''
         # is_CNYE
         if key not in holi_dict_type.keys():
             is_CNYEs.append( False )
@@ -244,6 +274,7 @@ def get_ANOVA_df():
                     is_CNYEs.append( True )
             else:
                 is_CNYEs.append( False )
+        '''
 
         # is_NYE
         if key.month == 12 and key.day == 31:
@@ -251,47 +282,74 @@ def get_ANOVA_df():
         else:
             is_NYEs.append( False )
 
-    # holi_len
-    acc = 0
-    startIndex = 0
-    endIndex = 0
-    currentType = holi_types[ 0 ]
-    for i in range( len( holi_types ) ):
-        if holi_types[ i ] == currentType:
-            endIndex += 1
-            acc += 1
-        else:
-            for j in range( startIndex, endIndex ):
-                if acc >= 5:
-                    acc = 5
-                holi_lens.append( acc )
-            acc = 1
-            startIndex = endIndex
-            currentType = holi_types[ i ]
-            endIndex += 1
+    holi_lens = [ 0 ] * len( holi_types )
+    phase = [ 'None' ] * len( holi_types )
+    belongs = [ 'None' ] * len( holi_types )
 
-    for i in range( startIndex, endIndex ):
-        holi_lens.append( acc )
-
+    # holi_len & phase & belong
+    startIndex = -1
+    duration = 0
     for i in range( len( holi_types ) ):
-        if holi_types[ i ] == 'weekday':
-            holi_lens[ i ] = 0
+        if ( startIndex == -1 ) and ( is_workings[ i ] == False ):
+            startIndex = i
+            duration = 0
+        if ( startIndex != -1 ) and ( is_workings[ i ] == True ):
+            for j in range( startIndex, i ):
+                holi_lens[ j ] = duration
+                belongs[ j ] = day_types[ startIndex ]
+            belongs[ startIndex - 1 ] = day_types[ startIndex ]
+
+            if duration >= 3:
+                phase[ startIndex - 1 ] = 'start'
+                phase[ startIndex ] = 'start'
+                for j in range( startIndex + 1, i - 1 ):
+                    phase[ j ] = 'mid'
+                phase[ i - 1 ] = 'end'
+
+            elif duration == 2:
+                phase[ startIndex - 1 ] = 'start'
+                phase[ startIndex ] = 'mid'
+                phase[ i - 1 ] = 'end'
+
+            startIndex = -1
+        duration += 1
+    '''
+    date -> datetime()
+    year -> int, year of the date 
+    month -> int, month of the date 
+    day -> int, day of the date 
+    weekday -> int, [0,6] the weekday of the date 
+    trans_cnt -> int, the transport cnt of the date 
+    is_typhoon -> bool, is typhoon that date 
+    is_working -> bool, whether the days need to work 
+    day_type -> str, 'traditional', 'national', 'weekdend', 'weekday'
+    is_foreign -> bool, is the date a foreign holiday 
+    holi_type -> str, the type of the holiday 
+    holi_lens -> int, the length of the not working day 
+    phase -> str, 'start', 'mid', 'end'
+    is_NYE -> bool, is new year eve 
+    belong -> which holiday ( or weekend ) the day belong to
+    '''
 
     ANOVA_df = pd.DataFrame( {
         'date': dates,
         'year': years,
         'month': months,
-        'weekday': weekdays,
         'day': days,
+        'weekday': weekdays,
         'trans_cnt': trans_cnts,
         'is_typhoon': is_typhoons,
+        'is_working': is_workings,
         'day_type': day_types,
+        'is_foreign': is_foreigns,
         'holi_type': holi_types,
         'holi_len': holi_lens,
-        'is_CNYE': is_CNYEs,
-        'is_NYE': is_NYEs
+        'phase': phase,
+        'is_NYE': is_NYEs,
+        'belong': belongs
     } )
-    return ANOVA_df
+
+    ANOVA_df.to_excel( 'ANOVA_df.xlsx' )
 
 
 def build_dict( dates, values ):
