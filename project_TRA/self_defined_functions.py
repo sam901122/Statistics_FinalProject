@@ -166,11 +166,17 @@ def gen_ANOVA_xlsx():
     typhoon_date = pd.read_excel( 'Typhoon_date.xlsx' )[ '日期' ]
     typhoon_date = [ date.to_pydatetime() for date in typhoon_date ]
     transCnt_dict = get_trCnt()
+    metroCnt_dict = {}
+    df_MRT = pd.read_excel( 'Metro.xlsx' )
+    mrtCnt = df_MRT[ 'Metro' ]
+    for i in range( len( mrtCnt ) ):
+        metroCnt_dict[ df_MRT[ 'date' ][ i ].to_pydatetime() ] = mrtCnt[ i ]
 
     # Set
     TRADI = [ '春節', '端午', '中秋' ]
     NATION = [ '雙十', '二二八', '元旦', '清明', '勞動' ]
 
+    mrtIndex = 0
     # List
     dates = []
     years = []
@@ -178,6 +184,7 @@ def gen_ANOVA_xlsx():
     days = []
     weekdays = []
     trans_cnts = []
+    mrt_cnts = []
     is_typhoons = []
     is_workings = []
     day_types = []
@@ -212,6 +219,12 @@ def gen_ANOVA_xlsx():
 
         # year
         years.append( key.year )
+
+        # mrt
+        try:
+            mrt_cnts.append( metroCnt_dict[ key ] )
+        except:
+            mrt_cnts.append( 0 )
 
         # month
         months.append( key.month )
@@ -338,6 +351,7 @@ def gen_ANOVA_xlsx():
         'day': days,
         'weekday': weekdays,
         'trans_cnt': trans_cnts,
+        'metro_cnt': mrt_cnts,
         'is_typhoon': is_typhoons,
         'is_working': is_workings,
         'day_type': day_types,
