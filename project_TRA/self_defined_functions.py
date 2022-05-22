@@ -363,3 +363,47 @@ def build_dict( dates, values ):
         temp_dict[ dates[ i ] ] = values[ i ]
 
     return temp_dict
+
+
+def friedman( df, drop=True ):
+    df_rank = df.iloc[ :, 1: ].apply( grank, axis=1 )
+    b, k = df_rank.shape
+    T_all = df_rank.sum()
+    print( T_all )
+    Fr = ( ( 12 / ( b * k * ( k+1 ) ) ) * np.sum( T_all**2 ) ) - ( 3 * b * ( k+1 ) )
+    pvalue = 1 - stats.chi2.cdf( Fr, k - 1 )
+    return pvalue
+
+
+def kruskal( *datas ):
+    datas = list( datas )
+    k = len( datas )
+    for i in range( k ):
+        datas[ i ] = np.array( datas[ i ] )
+
+    alldatas = []
+    for data in datas:
+        for i in range( len( data ) ):
+            alldatas.append( data[ i ] )
+    alldatas.sort()
+
+    temp_df = pd.DataFrame( { 'value': alldatas } )
+    temp_df[ 'rank' ] = temp_df.index + 1
+
+    v2r = temp_df.groupby( 'value' ).mean().reset_index()
+    Tv = []
+    ns = []
+
+    for data in datas:
+        ns.append( len( data ) )
+        data_df = pd.DataFrame( { 'value': data } )
+        Tv.append( pd.merge( data_df, v2r )[ "rank" ].sum() )
+
+    Tv = np.array( Tv )
+    ns = np.array( ns )
+    n_sum = ns.sum()
+
+    H = ( 12 / ( n_sum * ( n_sum+1 ) ) ) * ( sum( Tv**2 / ns ) ) - 3 * ( n_sum-1 )
+    pvalue = 1 - stats.chi2.cdf( H, k - 1 )
+
+    return pvalue
