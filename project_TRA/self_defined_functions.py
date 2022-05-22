@@ -295,7 +295,7 @@ def gen_ANOVA_xlsx():
             duration = 0
         if ( startIndex != -1 ) and ( is_workings[ i ] == True ):
             for j in range( startIndex, i ):
-                holi_lens[ j ] = duration
+                holi_lens[ j ] = min( duration, 5 )
                 belongs[ j ] = day_types[ startIndex ]
             belongs[ startIndex - 1 ] = day_types[ startIndex ]
 
