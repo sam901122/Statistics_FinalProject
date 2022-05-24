@@ -421,3 +421,46 @@ def kruskal( *datas ):
     pvalue = 1 - stats.chi2.cdf( H, k - 1 )
 
     return pvalue
+
+
+def Durbin_Watson_test( x ):
+    x_square_sum = np.vdot( x, x )
+    print( "x_square_sum = ", x_square_sum )
+    size = x.size
+    print( "size = ", size )
+    x_d = np.zeros( ( size ) )
+    print( "x_d = ", x_d )
+    l_size = size - 1
+    for i in range( l_size ):
+        x_d[ i + 1 ] = x[ i + 1 ] - x[ i ]
+    print( "x_d = ", x_d )
+    d = np.vdot( x_d, x_d ) / x_square_sum
+    print( "d = ", d )
+    return ( d )
+
+
+def runsTest( l, l_median ):
+    runs, n1, n2 = 1, 0, 0
+    if ( l[ 0 ] ) >= l_median:
+        n1 += 1
+    else:
+        n2 += 1
+    for i in range( 1, len( l ) ):
+        if ( l[ i ] >= l_median and l[ i - 1 ] < l_median ) or ( l[ i ] < l_median and l[ i - 1 ] >= l_median ):
+            runs += 1
+        if ( l[ i ] ) >= l_median:
+            n1 += 1
+        else:
+            n2 += 1
+    runs_exp = ( ( 2*n1*n2 ) / ( n1+n2 ) ) + 1
+    stan_dev = ( ( 2 * n1 * n2 * ( 2*n1*n2 - n1 - n2 ) ) / ( ( ( n1 + n2 )**2 ) * ( n1+n2-1 ) ) )**( 1 / 2 )
+    z = ( runs-runs_exp ) / stan_dev
+    pval_z = stats.norm.sf( abs( z ) ) * 2
+    print( 'runs = ', runs )
+    print( 'n1 = ', n1 )
+    print( 'n2 = ', n2 )
+    print( 'runs_exp = ', runs_exp )
+    print( 'stan_dev = ', stan_dev )
+    print( 'z = ', z )
+    print( 'pval_z = ', pval_z )
+    return pval_z
